@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Symbea Flower — 9 つの花（3 × 3）</title>
-<meta name="description" content="対称カオス写像が描く 9 種の花（ポインセチア、マーガレット、ライラック、アネモネ、センニチコウ、ダリア、ニゲラ、ブルーレースフラワー、マリーゴールド）を 3 × 3 に配置する。">
+<meta name="description" content="対称カオス写像が描く 9 種の花（ポインセチア、マーガレット、ライラック、アネモネ、センニチコウ、ダリア、ニゲラ、モモ、マリーゴールド）を 3 × 3 に配置する。">
 <style>
 :root {
   --bg: #fbfbfa; --surface: #ffffff; --text: #1c2230; --muted: #5a6475;
@@ -169,7 +169,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   <p class="hint">写像・ランダム探索・シードの仕組みは
   <a href="https://york-14.github.io/Generative-flower-Order-Chaos/2d-v2.html">Generative Flower 2D ver.2</a> と同じです。
   候補は発散せず、ボックス次元・余白が中庸で、最大 Lyapunov 指数が正（カオス）のものだけを採用し、さらに花ごとの条件（対称数・余白の範囲）を満たすものを優先します。
-  9 つの花の形は、同じ軌道を縮小・回転・極座標の変形をかけて何層か重ねることで作っています（ダリアは 6 層、ライラックやブルーレースフラワーは小花の房など）。どの花がどのマスに入るかもシードで決まります。</p>
+  9 つの花の形は、同じ軌道を縮小・回転・極座標の変形をかけて何層か重ねることで作っています（ダリアは 6 層、ライラックは小花の房、モモは雄しべの輪など）。どの花がどのマスに入るかもシードで決まります。</p>
   <p class="hint">シードは 12 桁の数（000000000000〜999999999999）で、日付 YYYYMMDDHHmm もそのまま使えます。
   左下のシードを入力欄に入れるか、URL に <code>?seed=12桁の数</code> を付けると、同じ 9 つの花を再現できます。数字以外の文字列はハッシュして 12 桁に収めます。
   マス i の花は乱数系列 i、色は系列 9、並び順は系列 10 です。ロックした花は種類ごとその場に残ります。再抽選・変奏・パラメータの編集・ロックした花の保持でシードの結果から変わったときは、シードの後ろに <code>*</code> が付きます。</p>
@@ -356,21 +356,13 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     }
     return out;
   }
-  // ブルーレースフラワー：5 弁の小花を、円形の散形花序に詰める（外周の小花ほど大きい）。
-  // 半分ほどは、小さな散形花序がさらに輪に並ぶ複散形花序にする。平たさ・小花の大きさも花ごとに変わる
-  function umbel(q, V) {
-    const r = hashRng(q), out = [], flat = V.v(0.94, 0.75, 1), fs = V.v(1, 0.8, 1.3);
-    const comp = V.flag(false, 0.5), m = 5 + Math.floor(V.r() * 4), cr = 0.3;
-    const centers = [[0, 0], ...Array.from({ length: m }, (_, i) => [0.6 * Math.cos(i * TAU / m), 0.6 * Math.sin(i * TAU / m)])];
-    for (let t = 0; t < 4000 && out.length < 140; t++) {
-      let x, y;
-      if (comp) { const [cx, cy] = centers[Math.floor(r() * centers.length)], a = r() * TAU, e = cr * Math.sqrt(r()); x = cx + e * Math.cos(a); y = cy + e * Math.sin(a); }
-      else { const a = r() * TAU, d = 0.9 * Math.sqrt(r()); x = d * Math.cos(a); y = d * Math.sin(a); }
-      y *= flat;
-      const s = (0.045 + 0.035 * Math.min(1, Math.hypot(x, y) / 0.9) + r() * 0.01) * fs * (comp ? 0.8 : 1);
-      if (out.every(o => Math.hypot(o.dx - x, o.dy - y) > (o.s + s) * 0.66)) out.push({ s, rot: r() * TAU, dx: x, dy: y });
-    }
-    return out;
+  // モモ：中心から長く伸びる雄しべの先の葯（やく）。同じ軌道をごく小さくして、半径をばらつかせた輪に並べる
+  function stamens(q, V) {
+    const r = hashRng(q), K = Math.round(V.v(24, 16, 36)), R0 = V.v(0.34, 0.24, 0.44), sp = V.v(0.08, 0.03, 0.14);
+    return Array.from({ length: K }, (_, i) => {
+      const a = (i + 0.5 * r()) * TAU / K, d = R0 + (r() * 2 - 1) * sp;
+      return { s: 0.032 + r() * 0.016, rot: r() * TAU, dx: d * Math.cos(a), dy: d * Math.sin(a), dens: 6 };
+    });
   }
   const disc = (s, dens = 3) => ({ s, warp: BALL, dens });     // 花の中心（同じ軌道を小さく丸めたもの）
   // form: 姿の変化の範囲（size: 大きさ、m: 花びらの数は n の何倍か、a: 切れ込みの深さ、p: 尖り、tw: ねじれの最大）
@@ -399,7 +391,11 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     { name: "ニゲラ", ns: [5], fill: [0.12, 0.42],
       form: { size: [0.78, 1], m: [1, 2], a: [0.1, 0.4], p: [1, 3], tw: 0.2 },
       layers: (q, V) => [{ s: 1, rot: Math.PI / 5, dens: V.v(0.3, 0.12, 0.55) }, { s: V.v(0.7, 0.55, 0.82), mod: true }, disc(V.v(0.17, 0.1, 0.24))] },
-    { name: "ブルーレースフラワー", ns: [5], fill: [0.3, 0.7], form: { size: [0.8, 1] }, layers: umbel },
+    // モモ：丸く幅の広い 5 枚の花びら（4 割ほどは八重咲きで内側にもう 1 段）と、放射状に広がる雄しべの葯
+    { name: "モモ", ns: [5], omega0: true, fill: [0.3, 0.7],
+      form: { size: [0.8, 1], m: [1], a: [0.2, 0.5], p: [0.4, 1.2], tw: 0.05 },
+      layers: (q, V) => [{ s: 1, mod: true }, ...(V.flag(false, 0.4) ? [{ s: V.v(0.68, 0.55, 0.8), rot: Math.PI / 5, mod: true }] : []),
+                         ...stamens(q, V), disc(V.v(0.1, 0.07, 0.14), 3)] },
     // マリーゴールド：縮れた花びらが幾重にも重なるポンポン咲き。半径を均等化（eq）して中心まで花びらで埋め、
     // 回転をばらばらにずらした層を内側ほど詰めて重ねる
     { name: "マリーゴールド", ns: [9, 10, 11, 12], fill: [0.18, 0.5],
