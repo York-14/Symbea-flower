@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Symbea Flower — 9 つの花（3 × 3）</title>
-<meta name="description" content="対称カオス写像が描く 9 種の花（ポインセチア、マーガレット、ライラック、アネモネ、センニチコウ、ダリア、ニゲラ、ブルーレースフラワー、ベニバナ）を 3 × 3 に配置する。">
+<meta name="description" content="対称カオス写像が描く 9 種の花（ポインセチア、マーガレット、ライラック、アネモネ、センニチコウ、ダリア、ニゲラ、ブルーレースフラワー、マリーゴールド）を 3 × 3 に配置する。">
 <style>
 :root {
   --bg: #fbfbfa; --surface: #ffffff; --text: #1c2230; --muted: #5a6475;
@@ -316,7 +316,8 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   // 9 つの花のコンセプト
   // 写像は変えず、(1) 対称数 n と探索条件（余白の範囲）、(2) 同じ軌道を重ねる「層」で花らしさを与える。
   // 層 = { s: 半径, rot: 回転, dx, dy: 中心のずれ, warp: 極座標の変形 r → r^warp, dens: 面積あたりの点の濃さ,
-  //        sy: 縦の縮率, upper: 回転後の上半分だけ描く }
+  //        sy: 縦の縮率, upper: 回転後の上半分だけ描く,
+  //        eq: 半径の均等化 r → √CDF(r)（軌道が中心から外周まで面積あたり均等に広がる。角度方向の形はそのまま） }
   // どの層も、アトラクタの中心の穴（内径 r0）を r → (r − r0)/(1 − r0) で閉じ、花びらが中心から出るようにする
   // ==================================================================================
   const TAU = Math.PI * 2;
@@ -365,10 +366,11 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     { name: "ニゲラ", ns: [5], fill: [0.12, 0.42],
       layers: () => [{ s: 1, rot: Math.PI / 5, dens: 0.3 }, { s: 0.7 }, disc(0.17)] },
     { name: "ブルーレースフラワー", ns: [5], fill: [0.3, 0.7], layers: umbel },
-    // ベニバナ：上半分だけの細い花糸の房（扇）が、丸い総苞とトゲのある苞の上から立ち上がる
-    { name: "ベニバナ", ns: [10, 11, 12], fill: [0.12, 0.45],
-      layers: q => [{ s: 0.78, dy: -0.08, upper: true }, { s: 0.52, dy: -0.3, rot: Math.PI / q.n, sy: 0.8, dens: 0.35 },
-                    { s: 0.36, dy: -0.3, warp: BALL, sy: 0.85, dens: 1.5 }] },
+    // マリーゴールド：縮れた花びらが幾重にも重なるポンポン咲き。半径を均等化（eq）して中心まで花びらで埋め、
+    // 回転をばらばらにずらした層を内側ほど詰めて重ねる
+    { name: "マリーゴールド", ns: [9, 10, 11, 12], fill: [0.18, 0.5],
+      layers: q => { const r = hashRng(q);
+        return Array.from({ length: 6 }, (_, k) => ({ s: 0.97 * 0.8 ** k, rot: r() * TAU, eq: true, warp: k % 2 ? 0.85 : 1, dens: 1 + k * 0.15 })); } },
   ];
 
   // 乱数の使い方は ver.2 と同じ（n の抽選も 1 回の乱数）。n と ω だけ花ごとの範囲に収める
@@ -543,13 +545,19 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     const pr = q && probe(q);
     if (!pr) { f.hist = null; requestPaint(); return; }
     const C = f.C, half = C / 2 - C / 90, inv = 1 / (pr.R * 1.02), h = f.hist;
-    // 中心の穴の半径（内径）を短い軌道で測る
+    // 中心の穴の半径（内径）と、半径の累積分布（eq の層で使う）を短い軌道で測る
     let x = pr.x, y = pr.y, rmin = Infinity;
-    for (let i = 0; i < 30000; i++) { step(q, x, y); x = NX; y = NY; const r = x * x + y * y; if (r < rmin) rmin = r; }
+    const NB = 512, cdf = new Float32Array(NB + 1);
+    for (let i = 0; i < 30000; i++) {
+      step(q, x, y); x = NX; y = NY; const r = x * x + y * y; if (r < rmin) rmin = r;
+      cdf[Math.min(NB - 1, Math.sqrt(r) * inv * NB | 0) + 1]++;
+    }
+    for (let i = 1; i <= NB; i++) cdf[i] += cdf[i - 1];
+    for (let i = 0; i <= NB; i++) cdf[i] = Math.sqrt(cdf[i] / cdf[NB]);
     const r0 = Math.min(0.9, Math.sqrt(rmin) * inv * 0.94), k0 = 1 / (1 - r0);
     x = pr.x; y = pr.y;
     const L = f.concept.layers(q).map(l => {
-      l = { s: 1, rot: 0, dx: 0, dy: 0, warp: 1, dens: 1, sy: 1, upper: false, ...l };
+      l = { s: 1, rot: 0, dx: 0, dy: 0, warp: 1, dens: 1, sy: 1, upper: false, eq: false, ...l };
       return { ...l, cs: Math.cos(l.rot) * l.s * half, sn: Math.sin(l.rot) * l.s * half,
                ox: C / 2 + l.dx * half, oy: C / 2 - l.dy * half, w: l.s * l.s * l.dens };
     });
@@ -569,7 +577,12 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
         const l = L[slots[(hs ^ hs >>> 16) >>> 20]];
         let u = x * inv, v = y * inv;
         const r = Math.hypot(u, v);
-        if (r > 0) { const m = Math.pow(Math.max(0, (r - r0) * k0), l.warp) / r; u *= m; v *= m; }
+        if (r > 0) {
+          let rr;
+          if (l.eq) { const t = Math.min(NB, r * NB), i0 = Math.min(NB - 1, t | 0); rr = cdf[i0] + (cdf[i0 + 1] - cdf[i0]) * (t - i0); }
+          else rr = Math.max(0, (r - r0) * k0);
+          const m = Math.pow(rr, l.warp) / r; u *= m; v *= m;
+        }
         const ry = u * l.sn + v * l.cs;
         if (l.upper && ry < 0) continue;
         const px = (l.ox + u * l.cs - v * l.sn) | 0, py = (l.oy - ry * l.sy) | 0;
