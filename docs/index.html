@@ -317,60 +317,95 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   // 写像は変えず、(1) 対称数 n と探索条件（余白の範囲）、(2) 同じ軌道を重ねる「層」で花らしさを与える。
   // 層 = { s: 半径, rot: 回転, dx, dy: 中心のずれ, warp: 極座標の変形 r → r^warp, dens: 面積あたりの点の濃さ,
   //        sy: 縦の縮率, upper: 回転後の上半分だけ描く,
-  //        eq: 半径の均等化 r → √CDF(r)（軌道が中心から外周まで面積あたり均等に広がる。角度方向の形はそのまま） }
+  //        eq: 半径の均等化 r → √CDF(r)（軌道が中心から外周まで面積あたり均等に広がる。角度方向の形はそのまま）,
+  //        mod: 姿の変化（花びらの輪郭・ねじれ）をかける }
   // どの層も、アトラクタの中心の穴（内径 r0）を r → (r − r0)/(1 − r0) で閉じ、花びらが中心から出るようにする
   // ==================================================================================
   const TAU = Math.PI * 2;
   const BALL = 0.55;                          // r → r^0.55：内側を押し広げて、球・円盤のように詰まった形にする
-  // パラメータから決まる乱数（ライラックの房の配置など）。パラメータが同じなら同じ形になる
-  function hashRng(q) {
-    let h = 0x811C9DC5;
+  // パラメータから決まる乱数（ライラックの房の配置など）。パラメータが同じなら同じ形になる。salt で系列を分ける
+  function hashRng(q, salt = 0) {
+    let h = 0x811C9DC5 ^ Math.imul(salt, 0x9E3779B9);
     for (const ch of [q.n, q.lam, q.alpha, q.beta, q.gamma, q.omega].map(v => (+v).toFixed(6)).join(","))
       h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193);
     return sfc32(h >>> 0, 0x9E3779B9, 0x243F6A88, 0xB7E15162);
   }
-  // ライラック：4 弁の小花を、下がふくらみ上が尖った卵形の房（円錐花序）に、互いに一定の距離を空けて詰める
-  function panicle(q) {
-    const r = hashRng(q), out = [];
-    const width = h => 0.46 * Math.pow(Math.sin(Math.PI * (0.1 + 0.9 * h)), 0.7) * (1 - 0.3 * h);
-    for (let t = 0; t < 1500 && out.length < 70; t++) {
+  // 姿の変化：パラメータから決まる乱数で、花の大きさ・花びらの輪郭・ねじれ・層の構成を変える。
+  // 輪郭は r → r·(1 − a(1 − |cos(k(θ − φ)/2)|^p))（k = n または 2n 枚の花びら、a: 切れ込みの深さ、p: 尖り）、
+  // ねじれは θ → θ + tw·r。vary（パネルの「変化」）が 0 なら既定の姿、1 で花ごとの範囲いっぱいに変わる
+  function form(q, c, vary) {
+    const r = hashRng(q, 1), F = c.form || {}, k = q.n * pick(r, F.m || [1]);
+    const size = rnd(r, ...(F.size || [1, 1])), a = rnd(r, ...(F.a || [0, 0])), p = rnd(r, ...(F.p || [1, 1]));
+    const phase = r() < 0.5 ? 0 : Math.PI / k, tw = (F.tw || 0) * rnd(r, -1, 1), lr = hashRng(q, 2);
+    return {
+      k, p, phase, size: 1 - (1 - size) * vary, a: Math.min(0.9, a * vary), tw: tw * vary,
+      r: lr,
+      v: (def, lo, hi) => def + (rnd(lr, lo, hi) - def) * Math.min(1, vary),   // 既定値から範囲内の値へ vary の割合で寄せる
+      flag: (def, prob) => { const u = lr(); return vary > 0 ? u < prob : def; },
+    };
+  }
+  // ライラック：4 弁の小花を、下がふくらみ上が尖った卵形の房（円錐花序）に、互いに一定の距離を空けて詰める。
+  // 房の幅・尖り方・小花の大きさが花ごとに変わる
+  function panicle(q, V) {
+    const r = hashRng(q), out = [], W = V.v(0.46, 0.3, 0.6), pt = V.v(0.7, 0.35, 1.4), fs = V.v(1, 0.75, 1.35);
+    const width = h => W * Math.pow(Math.sin(Math.PI * (0.1 + 0.9 * h)), pt) * (1 - 0.3 * h);
+    for (let t = 0; t < 1500 && out.length < 90; t++) {
       const h = r(), x = (r() * 2 - 1) * width(h), y = -0.84 + 1.72 * h;
-      const s = 0.065 + 0.05 * (1 - h) + r() * 0.02;
+      const s = (0.065 + 0.05 * (1 - h) + r() * 0.02) * fs;
       if (out.every(o => Math.hypot(o.dx - x, o.dy - y) > (o.s + s) * 0.62)) out.push({ s, rot: r() * TAU, dx: x, dy: y });
     }
     return out;
   }
-  // ブルーレースフラワー：5 弁の小花を、ほぼ円形の散形花序に詰める（外周の小花ほど大きい）
-  function umbel(q) {
-    const r = hashRng(q), out = [];
+  // ブルーレースフラワー：5 弁の小花を、円形の散形花序に詰める（外周の小花ほど大きい）。
+  // 半分ほどは、小さな散形花序がさらに輪に並ぶ複散形花序にする。平たさ・小花の大きさも花ごとに変わる
+  function umbel(q, V) {
+    const r = hashRng(q), out = [], flat = V.v(0.94, 0.75, 1), fs = V.v(1, 0.8, 1.3);
+    const comp = V.flag(false, 0.5), m = 5 + Math.floor(V.r() * 4), cr = 0.3;
+    const centers = [[0, 0], ...Array.from({ length: m }, (_, i) => [0.6 * Math.cos(i * TAU / m), 0.6 * Math.sin(i * TAU / m)])];
     for (let t = 0; t < 4000 && out.length < 140; t++) {
-      const a = r() * TAU, d = 0.9 * Math.sqrt(r()), x = d * Math.cos(a), y = d * Math.sin(a) * 0.94;
-      const s = 0.045 + 0.035 * (d / 0.9) + r() * 0.01;
+      let x, y;
+      if (comp) { const [cx, cy] = centers[Math.floor(r() * centers.length)], a = r() * TAU, e = cr * Math.sqrt(r()); x = cx + e * Math.cos(a); y = cy + e * Math.sin(a); }
+      else { const a = r() * TAU, d = 0.9 * Math.sqrt(r()); x = d * Math.cos(a); y = d * Math.sin(a); }
+      y *= flat;
+      const s = (0.045 + 0.035 * Math.min(1, Math.hypot(x, y) / 0.9) + r() * 0.01) * fs * (comp ? 0.8 : 1);
       if (out.every(o => Math.hypot(o.dx - x, o.dy - y) > (o.s + s) * 0.66)) out.push({ s, rot: r() * TAU, dx: x, dy: y });
     }
     return out;
   }
   const disc = (s, dens = 3) => ({ s, warp: BALL, dens });     // 花の中心（同じ軌道を小さく丸めたもの）
+  // form: 姿の変化の範囲（size: 大きさ、m: 花びらの数は n の何倍か、a: 切れ込みの深さ、p: 尖り、tw: ねじれの最大）
   const CONCEPTS = [
     { name: "ポインセチア", ns: [5, 6], omega0: true, fill: [0.15, 0.45],
-      layers: q => [{ s: 1 }, { s: 0.6, rot: Math.PI / q.n }, disc(0.13, 2.5)] },
+      form: { size: [0.78, 1], m: [1], a: [0.15, 0.55], p: [1.5, 4], tw: 0.12 },
+      layers: (q, V) => { const t = Math.round(V.v(2, 2, 3.4)), s2 = V.v(0.6, 0.45, 0.75);
+        return [...Array.from({ length: t }, (_, k) => ({ s: s2 ** k, rot: k * Math.PI / q.n, mod: true })), disc(V.v(0.13, 0.08, 0.18), 2.5)]; } },
     { name: "マーガレット", ns: [9, 10, 11, 12], fill: [0.15, 0.5],
-      layers: q => [{ s: 1 }, { s: 0.96, rot: Math.PI / q.n }, disc(0.22)] },
-    { name: "ライラック", ns: [4], fill: [0.35, 0.7], layers: panicle },
+      form: { size: [0.78, 1], m: [2], a: [0.05, 0.4], p: [0.8, 2.5], tw: 0.15 },
+      layers: (q, V) => [{ s: 1, mod: true }, ...(V.flag(true, 0.65) ? [{ s: V.v(0.96, 0.8, 1), rot: Math.PI / q.n, mod: true }] : []),
+                         disc(V.v(0.22, 0.14, 0.32))] },
+    { name: "ライラック", ns: [4], fill: [0.35, 0.7], form: { size: [0.82, 1] }, layers: panicle },
     { name: "アネモネ", ns: [5, 6, 7, 8], fill: [0.35, 0.7],
-      layers: () => [{ s: 1 }, disc(0.28, 4)] },
+      form: { size: [0.75, 1], m: [1], a: [0.1, 0.45], p: [0.5, 1.6], tw: 0.25 },
+      layers: (q, V) => [{ s: 1, mod: true }, ...(V.flag(false, 0.45) ? [{ s: V.v(0.65, 0.5, 0.78), rot: Math.PI / q.n, mod: true, dens: 0.8 }] : []),
+                         disc(V.v(0.28, 0.18, 0.38), 4)] },
     { name: "センニチコウ", ns: [8, 9, 10, 11, 12], fill: [0.3, 0.7],
-      layers: q => [0.84, 0.7, 0.55, 0.4, 0.24].map((s, k) => ({ s, rot: k * Math.PI / q.n + k * 0.11, warp: BALL })) },
+      form: { size: [0.6, 0.92], m: [2], a: [0.03, 0.2], p: [1, 3], tw: 0.25 },
+      layers: (q, V) => { const t = Math.round(V.v(5, 3, 6.4));
+        return Array.from({ length: t }, (_, k) => ({ s: 0.84 - k * 0.64 / (t - 1), rot: k * Math.PI / q.n + k * 0.11, warp: BALL, mod: true })); } },
     { name: "ダリア", ns: [8, 9, 10, 11, 12], fill: [0.2, 0.65],
-      layers: q => Array.from({ length: 6 }, (_, k) => ({ s: 0.98 * 0.8 ** k, rot: (k % 2) * Math.PI / q.n + k * 0.06 })) },
+      form: { size: [0.82, 1], m: [1], a: [0.15, 0.5], p: [0.8, 3], tw: 0.5 },
+      layers: (q, V) => { const t = Math.round(V.v(6, 4, 8.4)), ratio = V.v(0.8, 0.72, 0.86), jit = V.v(0.06, 0, 0.18);
+        return Array.from({ length: t }, (_, k) => ({ s: 0.98 * ratio ** k, rot: (k % 2) * Math.PI / q.n + k * jit, mod: true })); } },
     { name: "ニゲラ", ns: [5], fill: [0.12, 0.42],
-      layers: () => [{ s: 1, rot: Math.PI / 5, dens: 0.3 }, { s: 0.7 }, disc(0.17)] },
-    { name: "ブルーレースフラワー", ns: [5], fill: [0.3, 0.7], layers: umbel },
+      form: { size: [0.78, 1], m: [1, 2], a: [0.1, 0.4], p: [1, 3], tw: 0.2 },
+      layers: (q, V) => [{ s: 1, rot: Math.PI / 5, dens: V.v(0.3, 0.12, 0.55) }, { s: V.v(0.7, 0.55, 0.82), mod: true }, disc(V.v(0.17, 0.1, 0.24))] },
+    { name: "ブルーレースフラワー", ns: [5], fill: [0.3, 0.7], form: { size: [0.8, 1] }, layers: umbel },
     // マリーゴールド：縮れた花びらが幾重にも重なるポンポン咲き。半径を均等化（eq）して中心まで花びらで埋め、
     // 回転をばらばらにずらした層を内側ほど詰めて重ねる
     { name: "マリーゴールド", ns: [9, 10, 11, 12], fill: [0.18, 0.5],
-      layers: q => { const r = hashRng(q);
-        return Array.from({ length: 6 }, (_, k) => ({ s: 0.97 * 0.8 ** k, rot: r() * TAU, eq: true, warp: k % 2 ? 0.85 : 1, dens: 1 + k * 0.15 })); } },
+      form: { size: [0.72, 1], m: [2], a: [0.05, 0.28], p: [1, 3], tw: 0.5 },
+      layers: (q, V) => { const t = Math.round(V.v(6, 4, 7.4)), ratio = V.v(0.8, 0.74, 0.86);
+        return Array.from({ length: t }, (_, k) => ({ s: 0.97 * ratio ** k, rot: V.r() * TAU, eq: true, warp: k % 2 ? 0.85 : 1, dens: 1 + k * 0.15, mod: true })); } },
   ];
 
   // 乱数の使い方は ver.2 と同じ（n の抽選も 1 回の乱数）。n と ω だけ花ごとの範囲に収める
@@ -391,22 +426,31 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     };
   }
 
-  // 対称性が崩れた（片側だけに寄った）アトラクタを除く：軌道の重心が中心から R の 4% 以内
-  function centered(q) {
+  // 対称性が崩れたアトラクタを除く。n 回対称なら角度の Fourier 係数 E[e^{ijθ}] は j が n の倍数以外で 0 になるので、
+  // j = 1 … n−1 の大きさがすべて 0.1 未満であることを確かめる（片側に寄った形や、2 回対称の蝶ネクタイ形を除く）
+  function symmetric(q) {
     const pr = probe(q, 3000);
     if (!pr) return false;
-    let x = pr.x, y = pr.y, sx = 0, sy = 0;
-    for (let i = 0; i < 6000; i++) { step(q, x, y); x = NX; y = NY; sx += x; sy += y; }
-    return Math.hypot(sx, sy) / 6000 < 0.04 * pr.R;
+    const N = 6000, re = new Float64Array(q.n), im = new Float64Array(q.n);
+    let x = pr.x, y = pr.y;
+    for (let i = 0; i < N; i++) {
+      step(q, x, y); x = NX; y = NY;
+      const r = Math.hypot(x, y); if (!r) continue;
+      const wr = x / r, wi = y / r;
+      let pr_ = 1, pi = 0;
+      for (let j = 1; j < q.n; j++) { const t = pr_ * wr - pi * wi; pi = pr_ * wi + pi * wr; pr_ = t; re[j] += pr_; im[j] += pi; }
+    }
+    for (let j = 1; j < q.n; j++) if (Math.hypot(re[j], im[j]) / N >= 0.1) return false;
+    return true;
   }
-  // ver.2 の基準（isGood）を満たし、さらに花ごとの余白の範囲に入り、中心に対して対称な候補を探す。
-  // 花の範囲に入る候補が見つからなければ、ver.2 の基準だけを満たした最初の候補を使う
+  // ver.2 の基準（isGood）を満たし、n 回対称が保たれ、さらに花ごとの余白の範囲に入る候補を探す。
+  // 花の余白の範囲に入る候補が見つからなければ、ver.2 の基準と対称性だけを満たした最初の候補を使う
   async function search(gen, c, isStale, maxTries = 1500) {
     let fallback = null;
     for (let t = 0; t < maxTries; t++) {
       const q = gen(), a = analyze(q);
-      if (isGood(a)) {
-        if (a.fill >= c.fill[0] && a.fill <= c.fill[1] && centered(q)) return q;
+      if (isGood(a) && symmetric(q)) {
+        if (a.fill >= c.fill[0] && a.fill <= c.fill[1]) return q;
         fallback ??= q;
       }
       if (fallback && t >= 600) return fallback;
@@ -480,11 +524,11 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   // 一枚のキャンバスに 9 つの花を描く
   // 花ごとにヒストグラムを持ち、合成時に花ごとに正規化 → 花ごとの色で塗って重ねる
   // ==================================================================================
-  const SKEY = "symbea.flower.v2";          // v1 は並び順が固定（花の種類も一部違う）なので読まない
+  const SKEY = "symbea.flower.v3";          // v2 以前は花の種類・姿の変化が違うので読まない
   const saved = store.get(SKEY) || {};
   const color = { ...COLOR_DEFAULT, ...(saved.color || {}) };
   if (!Array.isArray(color.each) || color.each.length !== 9) color.each = [...SKY9];
-  const layout = { size: 0.92, ...(saved.layout || {}) };
+  const layout = { size: 0.92, vary: 1, ...(saved.layout || {}) };
   let seed = Number.isSafeInteger(saved.seed) && saved.seed >= 0 && saved.seed < SEED_SPACE ? saved.seed : null, edited = !!saved.edited;
 
   const canvas = $("cv"), S = canvas.width, CELL = S / 3, TOTAL = 2.5e6;
@@ -556,10 +600,11 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     for (let i = 0; i <= NB; i++) cdf[i] = Math.sqrt(cdf[i] / cdf[NB]);
     const r0 = Math.min(0.9, Math.sqrt(rmin) * inv * 0.94), k0 = 1 / (1 - r0);
     x = pr.x; y = pr.y;
-    const L = f.concept.layers(q).map(l => {
-      l = { s: 1, rot: 0, dx: 0, dy: 0, warp: 1, dens: 1, sy: 1, upper: false, eq: false, ...l };
-      return { ...l, cs: Math.cos(l.rot) * l.s * half, sn: Math.sin(l.rot) * l.s * half,
-               ox: C / 2 + l.dx * half, oy: C / 2 - l.dy * half, w: l.s * l.s * l.dens };
+    const V = form(q, f.concept, layout.vary), sz = V.size * half;
+    const L = f.concept.layers(q, V).map(l => {
+      l = { s: 1, rot: 0, dx: 0, dy: 0, warp: 1, dens: 1, sy: 1, upper: false, eq: false, mod: false, ...l };
+      return { ...l, cs: Math.cos(l.rot) * l.s * sz, sn: Math.sin(l.rot) * l.s * sz, mod: l.mod && (V.a > 0 || V.tw !== 0),
+               ox: C / 2 + l.dx * sz, oy: C / 2 - l.dy * sz, w: l.s * l.s * l.dens };
     });
     // 軌道の点を層に配る。割合は 面積 × 濃さ に比例（4096 個の枠に並べる）。
     // 軌道は n 個の花びらを周期的に巡るので、点の番号を整数ハッシュで混ぜて枠を選ぶ（周期と同期すると層ごとに一部の花びらしか描かれない）
@@ -581,7 +626,12 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
           let rr;
           if (l.eq) { const t = Math.min(NB, r * NB), i0 = Math.min(NB - 1, t | 0); rr = cdf[i0] + (cdf[i0 + 1] - cdf[i0]) * (t - i0); }
           else rr = Math.max(0, (r - r0) * k0);
-          const m = Math.pow(rr, l.warp) / r; u *= m; v *= m;
+          if (l.warp !== 1) rr = Math.pow(rr, l.warp);
+          if (l.mod) {
+            let th = Math.atan2(v, u);
+            if (V.a) rr *= 1 - V.a * (1 - Math.pow(Math.abs(Math.cos(V.k * (th - V.phase) / 2)), V.p));
+            th += V.tw * rr; u = rr * Math.cos(th); v = rr * Math.sin(th);
+          } else { const m = rr / r; u *= m; v *= m; }
         }
         const ry = u * l.sn + v * l.cs;
         if (l.upper && ry < 0) continue;
@@ -677,6 +727,12 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     layout.size = v;
     clearTimeout(layoutTimer);
     layoutTimer = setTimeout(() => { flowers.forEach(f => f.q && render(f)); save(); }, 80);
+  })();
+  // 姿の変化の強さ（0 で花ごとの既定の姿、1 で標準、1.5 まで強められる）
+  slider($("layoutSliders"), "変化", 0, 1.5, 0.01, 2, () => layout.vary, v => {
+    layout.vary = v;
+    clearTimeout(layoutTimer);
+    layoutTimer = setTimeout(() => { flowers.forEach(f => f.q && render(f)); save(); }, 120);
   })();
 
   const PARAMS = [
