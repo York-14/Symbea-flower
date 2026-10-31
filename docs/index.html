@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Symbea Flower — 9 つの花（3 × 3）</title>
-<meta name="description" content="対称カオス写像が描く 9 種の花（ポインセチア、マーガレット、ライラック、アネモネ、センニチコウ、ダリア、ニゲラ ほか）を 3 × 3 に配置する。">
+<meta name="description" content="対称カオス写像が描く 9 種の花（ポインセチア、マーガレット、ライラック、アネモネ、センニチコウ、ダリア、ニゲラ、ブルーレースフラワー、ベニバナ）を 3 × 3 に配置する。">
 <style>
 :root {
   --bg: #fbfbfa; --surface: #ffffff; --text: #1c2230; --muted: #5a6475;
@@ -85,6 +85,7 @@ a { color: var(--accent); }
 .panel .colors label { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; font-size: 11px; color: var(--muted); flex: 1; }
 .panel .grid9 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 8px; margin-top: 8px; }
 .panel .grid9 label { display: flex; flex-direction: column; gap: 1px; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.panel .grid9 label span { overflow: hidden; text-overflow: ellipsis; }
 .panel input[type=color] { width: 100%; height: 30px; border: 1px solid var(--border); border-radius: 6px; padding: 2px; background: var(--bg); cursor: pointer; }
 #swatch { height: 12px; border-radius: 6px; margin-top: 10px; border: 1px solid var(--border); }
 .hint { font-size: 13px; color: var(--muted); }
@@ -168,10 +169,10 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   <p class="hint">写像・ランダム探索・シードの仕組みは
   <a href="https://york-14.github.io/Generative-flower-Order-Chaos/2d-v2.html">Generative Flower 2D ver.2</a> と同じです。
   候補は発散せず、ボックス次元・余白が中庸で、最大 Lyapunov 指数が正（カオス）のものだけを採用し、さらに花ごとの条件（対称数・余白の範囲）を満たすものを優先します。
-  9 つの花の形は、同じ軌道を縮小・回転・極座標の変形をかけて何層か重ねることで作っています（ダリアは 6 層、ライラックは小花の房など）。</p>
+  9 つの花の形は、同じ軌道を縮小・回転・極座標の変形をかけて何層か重ねることで作っています（ダリアは 6 層、ライラックやブルーレースフラワーは小花の房など）。どの花がどのマスに入るかもシードで決まります。</p>
   <p class="hint">シードは 12 桁の数（000000000000〜999999999999）で、日付 YYYYMMDDHHmm もそのまま使えます。
   左下のシードを入力欄に入れるか、URL に <code>?seed=12桁の数</code> を付けると、同じ 9 つの花を再現できます。数字以外の文字列はハッシュして 12 桁に収めます。
-  花 i は乱数系列 i、色は系列 9 です。再抽選・変奏・パラメータの編集・ロックした花の保持でシードの結果から変わったときは、シードの後ろに <code>*</code> が付きます。</p>
+  マス i の花は乱数系列 i、色は系列 9、並び順は系列 10 です。ロックした花は種類ごとその場に残ります。再抽選・変奏・パラメータの編集・ロックした花の保持でシードの結果から変わったときは、シードの後ろに <code>*</code> が付きます。</p>
 
   <footer>Base: <a href="https://github.com/York-14/Generative-flower-Order-Chaos">github.com/York-14/Generative-flower-Order-Chaos</a></footer>
 </main>
@@ -314,7 +315,8 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   // ==================================================================================
   // 9 つの花のコンセプト
   // 写像は変えず、(1) 対称数 n と探索条件（余白の範囲）、(2) 同じ軌道を重ねる「層」で花らしさを与える。
-  // 層 = { s: 半径, rot: 回転, dx, dy: 中心のずれ, warp: 極座標の変形 r → r^warp, dens: 面積あたりの点の濃さ }
+  // 層 = { s: 半径, rot: 回転, dx, dy: 中心のずれ, warp: 極座標の変形 r → r^warp, dens: 面積あたりの点の濃さ,
+  //        sy: 縦の縮率, upper: 回転後の上半分だけ描く }
   // どの層も、アトラクタの中心の穴（内径 r0）を r → (r − r0)/(1 − r0) で閉じ、花びらが中心から出るようにする
   // ==================================================================================
   const TAU = Math.PI * 2;
@@ -337,6 +339,16 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     }
     return out;
   }
+  // ブルーレースフラワー：5 弁の小花を、ほぼ円形の散形花序に詰める（外周の小花ほど大きい）
+  function umbel(q) {
+    const r = hashRng(q), out = [];
+    for (let t = 0; t < 4000 && out.length < 140; t++) {
+      const a = r() * TAU, d = 0.9 * Math.sqrt(r()), x = d * Math.cos(a), y = d * Math.sin(a) * 0.94;
+      const s = 0.045 + 0.035 * (d / 0.9) + r() * 0.01;
+      if (out.every(o => Math.hypot(o.dx - x, o.dy - y) > (o.s + s) * 0.66)) out.push({ s, rot: r() * TAU, dx: x, dy: y });
+    }
+    return out;
+  }
   const disc = (s, dens = 3) => ({ s, warp: BALL, dens });     // 花の中心（同じ軌道を小さく丸めたもの）
   const CONCEPTS = [
     { name: "ポインセチア", ns: [5, 6], omega0: true, fill: [0.15, 0.45],
@@ -352,10 +364,11 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
       layers: q => Array.from({ length: 6 }, (_, k) => ({ s: 0.98 * 0.8 ** k, rot: (k % 2) * Math.PI / q.n + k * 0.06 })) },
     { name: "ニゲラ", ns: [5], fill: [0.12, 0.42],
       layers: () => [{ s: 1, rot: Math.PI / 5, dens: 0.3 }, { s: 0.7 }, disc(0.17)] },
-    { name: "クレマチス（仮）", ns: [4, 6, 8], fill: [0.3, 0.65],
-      layers: () => [{ s: 1 }, disc(0.2)] },
-    { name: "コスモス（仮）", ns: [8], omega0: true, fill: [0.2, 0.55],
-      layers: () => [{ s: 1 }, disc(0.15)] },
+    { name: "ブルーレースフラワー", ns: [5], fill: [0.3, 0.7], layers: umbel },
+    // ベニバナ：上半分だけの細い花糸の房（扇）が、丸い総苞とトゲのある苞の上から立ち上がる
+    { name: "ベニバナ", ns: [10, 11, 12], fill: [0.12, 0.45],
+      layers: q => [{ s: 0.78, dy: -0.08, upper: true }, { s: 0.52, dy: -0.3, rot: Math.PI / q.n, sy: 0.8, dens: 0.35 },
+                    { s: 0.36, dy: -0.3, warp: BALL, sy: 0.85, dens: 1.5 }] },
   ];
 
   // 乱数の使い方は ver.2 と同じ（n の抽選も 1 回の乱数）。n と ω だけ花ごとの範囲に収める
@@ -437,7 +450,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     return { base, each };
   }
 
-  // 花ごとのランプ（0〜1 の値。乗算用に 0 が背景側）
+  // 花の種類ごとのランプ（0〜1 の値。乗算用に 0 が背景側）。別色は花の種類に付く（並びが変わっても色は花についていく）
   const LUTS = Array.from({ length: 9 }, () => new Float32Array(256 * 3));
   const colorOf = i => color.mode === "each" ? color.each[i] : color.base;
   function ramp(hex, light) {
@@ -465,7 +478,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   // 一枚のキャンバスに 9 つの花を描く
   // 花ごとにヒストグラムを持ち、合成時に花ごとに正規化 → 花ごとの色で塗って重ねる
   // ==================================================================================
-  const SKEY = "symbea.flower.v1";
+  const SKEY = "symbea.flower.v2";          // v1 は並び順が固定（花の種類も一部違う）なので読まない
   const saved = store.get(SKEY) || {};
   const color = { ...COLOR_DEFAULT, ...(saved.color || {}) };
   if (!Array.isArray(color.each) || color.each.length !== 9) color.each = [...SKY9];
@@ -483,9 +496,13 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     mark.style.left = `${(i % 3) * 100 / 3}%`; mark.style.top = `${Math.floor(i / 3) * 100 / 3}%`;
     const lk = Object.assign(document.createElement("span"), { className: "lock", textContent: "ロック", hidden: true });
     const busy = Object.assign(document.createElement("span"), { className: "busy", hidden: true });
-    const nm = Object.assign(document.createElement("span"), { className: "name", textContent: CONCEPTS[i].name });
+    const nm = Object.assign(document.createElement("span"), { className: "name" });
     mark.append(lk, busy, nm); $("marks").append(mark);
-    flowers.push({ idx: i, concept: CONCEPTS[i], q: null, locked: false, job: 0, gen: 0, hist: null, C: 0, max: 1, pts: 0, mark, lk, busy });
+    flowers.push({ idx: i, ci: i, concept: CONCEPTS[i], q: null, locked: false, job: 0, gen: 0, hist: null, C: 0, max: 1, pts: 0, mark, lk, busy, nm });
+  }
+  // マス f に花の種類 ci を割り当てる
+  function setConcept(f, ci) {
+    f.ci = ci; f.concept = CONCEPTS[ci]; f.nm.textContent = f.concept.name;
   }
 
   // 1 フレームに 1 回だけ合成する
@@ -496,7 +513,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     F.fill(light ? 1 : 0);
     for (const f of flowers) {
       if (!f.hist || !f.q) continue;
-      const C = f.C, h = f.hist, lm = Math.log1p(f.max), L = LUTS[f.idx];
+      const C = f.C, h = f.hist, lm = Math.log1p(f.max), L = LUTS[f.ci];
       const ox = Math.round((f.idx % 3 + 0.5) * CELL - C / 2), oy = Math.round((Math.floor(f.idx / 3) + 0.5) * CELL - C / 2);
       for (let j = 0; j < C; j++) {
         const y = oy + j; if (y < 0 || y >= S) continue;
@@ -532,16 +549,16 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     const r0 = Math.min(0.9, Math.sqrt(rmin) * inv * 0.94), k0 = 1 / (1 - r0);
     x = pr.x; y = pr.y;
     const L = f.concept.layers(q).map(l => {
-      l = { s: 1, rot: 0, dx: 0, dy: 0, warp: 1, dens: 1, ...l };
+      l = { s: 1, rot: 0, dx: 0, dy: 0, warp: 1, dens: 1, sy: 1, upper: false, ...l };
       return { ...l, cs: Math.cos(l.rot) * l.s * half, sn: Math.sin(l.rot) * l.s * half,
                ox: C / 2 + l.dx * half, oy: C / 2 - l.dy * half, w: l.s * l.s * l.dens };
     });
-    // 軌道の点を層に配る。割合は 面積 × 濃さ に比例（256 個の枠に並べる）。
+    // 軌道の点を層に配る。割合は 面積 × 濃さ に比例（4096 個の枠に並べる）。
     // 軌道は n 個の花びらを周期的に巡るので、点の番号を整数ハッシュで混ぜて枠を選ぶ（周期と同期すると層ごとに一部の花びらしか描かれない）
-    const slots = new Uint8Array(256), wsum = L.reduce((a, l) => a + l.w, 0);
+    const NS = 4096, slots = new Uint16Array(NS), wsum = L.reduce((a, l) => a + l.w, 0);
     let acc = 0, k = 0;
-    L.forEach((l, j) => { acc += l.w / wsum * 256; while (k < Math.round(acc)) slots[k++] = j; });
-    while (k < 256) slots[k++] = L.length - 1;
+    L.forEach((l, j) => { acc += l.w / wsum * NS; while (k < Math.round(acc)) slots[k++] = j; });
+    while (k < NS) slots[k++] = L.length - 1;
     let n = 0;
     const CHUNK = 120000;
     (function chunk() {
@@ -549,11 +566,13 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
       for (let i = 0; i < CHUNK; i++, n++) {
         step(q, x, y); x = NX; y = NY;
         let hs = Math.imul(n ^ n >>> 16, 0x45D9F3B); hs = Math.imul(hs ^ hs >>> 16, 0x45D9F3B);
-        const l = L[slots[(hs ^ hs >>> 16) >>> 24]];
+        const l = L[slots[(hs ^ hs >>> 16) >>> 20]];
         let u = x * inv, v = y * inv;
         const r = Math.hypot(u, v);
         if (r > 0) { const m = Math.pow(Math.max(0, (r - r0) * k0), l.warp) / r; u *= m; v *= m; }
-        const px = (l.ox + u * l.cs - v * l.sn) | 0, py = (l.oy - (u * l.sn + v * l.cs)) | 0;
+        const ry = u * l.sn + v * l.cs;
+        if (l.upper && ry < 0) continue;
+        const px = (l.ox + u * l.cs - v * l.sn) | 0, py = (l.oy - ry * l.sy) | 0;
         if (px >= 0 && px < C && py >= 0 && py < C) { const c = ++h[py * C + px]; if (c > f.max) f.max = c; }
       }
       f.pts += CHUNK;
@@ -583,11 +602,25 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     await Promise.all([worker(), worker(), worker()]);
   }
 
-  // シードから 9 つを生成。花 i は系列 i、色は系列 9 を使う
+  // 並び順：系列 10 で 9 種の花をシャッフル（Fisher–Yates）
+  function order(s) {
+    const r = seedRng(s, 10), p = [...Array(9).keys()];
+    for (let i = 8; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+    return p;
+  }
+  // シードから 9 つを生成。マス i の花は系列 i、色は系列 9、並び順は系列 10 を使う。
+  // ロックした花は種類ごとその場に残し、残りの種類をシードの順で空いたマスに入れる
   function generate(s) {
     seed = s;
     const list = unlocked();
     edited = list.length < 9;
+    const kept = new Set(flowers.filter(f => f.locked).map(f => f.ci)), free = order(seed).filter(ci => !kept.has(ci));
+    list.forEach((f, k) => {
+      if (f.ci !== free[k]) { f.job++; f.q = null; f.hist = null; }
+      setConcept(f, free[k]);
+    });
+    if (sel) syncPanel();
+    requestPaint();
     if ($("rollColor").checked) { Object.assign(color, randomColor(seedRng(seed, 9))); syncColor(); recolor(); }
     showSeed(); save();
     rollMany(list, f => { const rng = seedRng(seed, f.idx); return () => randomParams(rng, f.concept); });
@@ -609,7 +642,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   }
 
   function save() {
-    store.set(SKEY, { cells: flowers.map(f => ({ q: f.q, locked: f.locked })), color, layout, sel: sel ? sel.idx : 4, seed, edited });
+    store.set(SKEY, { cells: flowers.map(f => ({ ci: f.ci, q: f.q, locked: f.locked })), color, layout, sel: sel ? sel.idx : 4, seed, edited });
   }
 
   // ==================================================================================
@@ -680,7 +713,8 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   // 色彩 UI
   CONCEPTS.forEach((c, i) => {
     const lab = document.createElement("label");
-    lab.textContent = c.name.replace(/（仮）$/, "");
+    lab.title = c.name;
+    lab.append(Object.assign(document.createElement("span"), { textContent: c.name }));
     const inp = Object.assign(document.createElement("input"), { type: "color", id: `each${i}` });
     inp.addEventListener("input", () => { color.each[i] = inp.value; recolor(); });
     lab.append(inp); $("eachColors").append(lab);
@@ -818,7 +852,9 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   syncColor(); recolor(); showSel(); showNames();
   let urlSeed = null;
   try { urlSeed = parseSeed(new URLSearchParams(location.search).get("seed")); } catch (e) { seedError(`URL の ${e.message}`); }
-  const hasSaved = Array.isArray(saved.cells) && saved.cells.length === 9;
+  const hasSaved = Array.isArray(saved.cells) && saved.cells.length === 9 &&
+    new Set(saved.cells.map(c => c && c.ci)).size === 9 && saved.cells.every(c => Number.isInteger(c.ci) && c.ci >= 0 && c.ci < 9);
+  flowers.forEach(f => setConcept(f, hasSaved ? saved.cells[f.idx].ci : f.idx));
   if (hasSaved) {
     saved.cells.forEach((s, i) => {
       const f = flowers[i];
