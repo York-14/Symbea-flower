@@ -27,22 +27,14 @@ a { color: var(--accent); }
   border: 1px solid var(--border);
 }
 .canvas-wrap canvas { width: 100%; height: 100%; display: block; }
-/* 選択枠・名前・ロック表示は画像には含めず、上に重ねるだけ */
+/* 選択の目印は画像には含めず、上に重ねるだけ（クリックした直後に少しだけ出す） */
 .mark {
   position: absolute; width: calc(100% / 3); height: calc(100% / 3); pointer-events: none;
   border: 1.5px dashed transparent; border-radius: 8px; transition: border-color .15s;
 }
-.show-sel .mark.sel { border-color: var(--accent); }
-.mark .lock {
-  position: absolute; right: 6px; top: 4px; font-size: 11px; padding: 0 6px; border-radius: 6px;
-  background: rgba(0, 0, 0, .45); color: #fff;
-}
-.mark .name {
-  position: absolute; left: 0; right: 0; top: 4px; text-align: center; font-size: 11px; letter-spacing: .08em;
-  color: var(--muted); opacity: .8;
-}
-.mark .name { display: none; }
-.show-names .mark .name { display: block; }
+.mark.flash { border-color: var(--accent); transition: none; }
+/* 透明な背景は市松模様で示す（画像には含めない） */
+.canvas-wrap.clear { background: repeating-conic-gradient(#e6eaf0 0% 25%, #fff 0% 50%) 0 0 / 20px 20px !important; }
 #seed {
   position: absolute; left: 10px; bottom: 6px; font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .03em; color: rgba(0, 0, 0, .3); pointer-events: none; user-select: none;
@@ -113,7 +105,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   <h1>Symbea Flower</h1>
   <p class="lead">対称カオス写像 z<sub>t+1</sub> = ( λ + α|z|² + β Re(z<sup>n</sup>) + iω ) z + γ z̄<sup>n−1</sup> が描く 9 種の花を、
   一枚のビジュアルの上に 3 × 3 で配置します。花ごとに対称数・探索条件・重ね方（層）を変え、それぞれの花らしさを写像の上に与えています。
-  花をクリックすると、その花のパラメータを右のパネルで調整できます。</p>
+  花をクリックして選ぶと、ほかの 8 つをその花の変奏で埋められます。</p>
 
   <div class="studio">
     <div class="canvas-wrap" id="wrap" tabindex="0" role="button" aria-label="花を選ぶ">
@@ -129,6 +121,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
       </div>
       <button id="rollAll" class="primary">9 つをランダム探索</button>
       <button id="variations">選んだ花の変奏で埋める</button>
+      <p class="hint" style="margin:4px 0 0">花をクリックして選ぶと、ほかの 8 つをその花の変奏で埋められます。</p>
       <div class="seedrow">
         <input type="text" id="seedIn" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="12 桁のシード" aria-label="シード（12 桁）">
         <button id="seedGo">このシードで生成</button>
@@ -138,16 +131,6 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
       <label class="check"><input type="checkbox" id="rollColor"> 探索のたびに色も変える</label>
       <div id="layoutSliders"></div>
       <button id="saveAll">PNG で保存</button>
-      <p class="hint" style="margin:8px 0 0">ロックした花は再探索・変奏で置き換えません。</p>
-
-      <h4 id="selTitle">選択中の花</h4>
-      <div class="row">
-        <button id="rollOne">再抽選</button>
-        <button id="lock">ロック</button>
-      </div>
-      <div id="sliders"></div>
-      <label class="check"><input type="checkbox" id="showSel"> 選択枠を表示</label>
-      <label class="check"><input type="checkbox" id="showNames"> 花の名前を表示（画像には含めない）</label>
 
       <h4>色彩</h4>
       <div class="seg" role="radiogroup" aria-label="色の割り当て">
@@ -157,6 +140,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
       <div class="colors" id="sameColors"><label>花の色<input type="color" id="base"></label></div>
       <div class="grid9" id="eachColors"></div>
       <div class="colors"><label>背景<input type="color" id="bg"></label></div>
+      <label class="check"><input type="checkbox" id="bgClear"> 背景を透明にする（PNG も透明で保存）</label>
       <div id="colorSliders"></div>
       <div id="swatch"></div>
       <div class="row">
@@ -172,7 +156,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   9 つの花の形は、同じ軌道を縮小・回転・極座標の変形をかけて何層か重ねることで作っています（ダリアは 6 層、アマリリスは 6 弁の星と雄しべ、モモは雄しべの輪など）。どの花がどのマスに入るかもシードで決まります。</p>
   <p class="hint">シードは 12 桁の数（000000000000〜999999999999）で、日付 YYYYMMDDHHmm もそのまま使えます。
   左下のシードを入力欄に入れるか、URL に <code>?seed=12桁の数</code> を付けると、同じ 9 つの花を再現できます。数字以外の文字列はハッシュして 12 桁に収めます。
-  マス i の花は乱数系列 i、色は系列 9、並び順は系列 10 です。ロックした花は種類ごとその場に残ります。再抽選・変奏・パラメータの編集・ロックした花の保持でシードの結果から変わったときは、シードの後ろに <code>*</code> が付きます。</p>
+  マス i の花は乱数系列 i、色は系列 9、並び順は系列 10 です。変奏でシードの結果から変わったときは、シードの後ろに <code>*</code> が付きます。</p>
 
   <footer>Base: <a href="https://github.com/York-14/Generative-flower-Order-Chaos">github.com/York-14/Generative-flower-Order-Chaos</a></footer>
 </main>
@@ -502,7 +486,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   const lumOf = c => (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255;
   const SKY = "#4fb0e3";
   const SKY9 = ["#4fb0e3", "#6cc4ec", "#3d97d6", "#58bcd9", "#7fb6ee", "#3a86c8", "#63c7e3", "#4b9fe6", "#8ccbef"];
-  const COLOR_DEFAULT = { mode: "same", base: SKY, each: SKY9, bg: "#ffffff", depth: 0.55, gamma: 0.8, exposure: 1.1 };
+  const COLOR_DEFAULT = { mode: "same", base: SKY, each: SKY9, bg: "#ffffff", transparent: false, depth: 0.55, gamma: 0.8, exposure: 1.1 };
   const COLOR_SLIDERS = [["depth", "芯の濃さ", 0, 0.9, 0.01, 2], ["gamma", "ガンマ", 0.3, 2, 0.01, 2],
                          ["exposure", "露出", 0.4, 3, 0.01, 2]];
 
@@ -531,8 +515,10 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     return t => t < M ? start.map((v, k) => v + (mid[k] - v) * (t / M))
                       : mid.map((v, k) => v + (end[k] - v) * ((t - M) / (1 - M)));
   }
+  // 透明な背景は白い背景と同じく乗算で塗り、最後に白からの差をアルファに変える
+  const isLight = () => color.transparent || lumOf(hex2rgb(color.bg)) > 0.5;
   function buildLUT() {
-    const light = lumOf(hex2rgb(color.bg)) > 0.5;
+    const light = isLight();
     for (let i = 0; i < 9; i++) {
       const f = ramp(colorOf(i), light), L = LUTS[i];
       for (let t = 0; t < 256; t++) { const c = f(t / 255); L[t * 3] = c[0]; L[t * 3 + 1] = c[1]; L[t * 3 + 2] = c[2]; }
@@ -563,22 +549,20 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   for (let i = 0; i < 9; i++) {
     const mark = Object.assign(document.createElement("div"), { className: "mark" });
     mark.style.left = `${(i % 3) * 100 / 3}%`; mark.style.top = `${Math.floor(i / 3) * 100 / 3}%`;
-    const lk = Object.assign(document.createElement("span"), { className: "lock", textContent: "ロック", hidden: true });
     const busy = Object.assign(document.createElement("span"), { className: "busy", hidden: true });
-    const nm = Object.assign(document.createElement("span"), { className: "name" });
-    mark.append(lk, busy, nm); $("marks").append(mark);
-    flowers.push({ idx: i, ci: i, concept: CONCEPTS[i], q: null, locked: false, job: 0, gen: 0, hist: null, C: 0, max: 1, pts: 0, mark, lk, busy, nm });
+    mark.append(busy); $("marks").append(mark);
+    flowers.push({ idx: i, ci: i, concept: CONCEPTS[i], q: null, job: 0, gen: 0, hist: null, C: 0, max: 1, pts: 0, mark, busy });
   }
   // マス f に花の種類 ci を割り当てる
   function setConcept(f, ci) {
-    f.ci = ci; f.concept = CONCEPTS[ci]; f.nm.textContent = f.concept.name;
+    f.ci = ci; f.concept = CONCEPTS[ci];
   }
 
   // 1 フレームに 1 回だけ合成する
   let paintReq = 0;
   const requestPaint = () => { if (!paintReq) paintReq = requestAnimationFrame(() => { paintReq = 0; paint(); }); };
   function paint() {
-    const BG = hex2rgb(color.bg), light = lumOf(BG) > 0.5, g = color.gamma, ex = color.exposure;
+    const BG = hex2rgb(color.bg), light = isLight(), clear = color.transparent, g = color.gamma, ex = color.exposure;
     F.fill(light ? 1 : 0);
     for (const f of flowers) {
       if (!f.hist || !f.q) continue;
@@ -595,10 +579,16 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
         }
       }
     }
-    wrap.style.background = color.bg;
+    wrap.style.background = color.bg; wrap.classList.toggle("clear", clear);
     $("seed").style.color = light ? "rgba(0, 0, 0, .3)" : "rgba(255, 255, 255, .32)";
     const d = img.data;
     for (let p = 0, k = 0; p < S * S; p++, k += 3) {
+      if (clear) {   // 白に重ねたときに乗算の結果と同じ色になるアルファと色
+        const al = 1 - Math.min(F[k], F[k + 1], F[k + 2]);
+        for (let c = 0; c < 3; c++) d[p * 4 + c] = al > 0 ? 255 * (F[k + c] - 1 + al) / al : 0;
+        d[p * 4 + 3] = 255 * al;
+        continue;
+      }
       for (let c = 0; c < 3; c++) d[p * 4 + c] = light ? BG[c] * F[k + c] : 255 - (255 - BG[c]) * (1 - F[k + c]);
       d[p * 4 + 3] = 255;
     }
@@ -681,7 +671,6 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     if (!q) return;                               // search は必ず候補を返す（ここに来るのは打ち切られたときだけ）
     f.busy.hidden = true;
     f.q = q; render(f); save();
-    if (f === sel) syncPanel();
   }
 
   // 9 つを同時に探索すると重いので 3 並列で順番に（新しい一括探索が始まったら古いものは打ち切る）
@@ -699,22 +688,19 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     for (let i = 8; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
     return p;
   }
-  // シードから 9 つを生成。マス i の花は系列 i、色は系列 9、並び順は系列 10 を使う。
-  // ロックした花は種類ごとその場に残し、残りの種類をシードの順で空いたマスに入れる
+  // シードから 9 つを生成。マス i の花は系列 i、色は系列 9、並び順は系列 10 を使う
   function generate(s) {
-    seed = s;
-    const list = unlocked();
-    edited = list.length < 9;
-    const kept = new Set(flowers.filter(f => f.locked).map(f => f.ci)), free = order(seed).filter(ci => !kept.has(ci));
-    list.forEach((f, k) => {
-      if (f.ci !== free[k]) { f.job++; f.q = null; f.hist = null; }
-      setConcept(f, free[k]);
+    seed = s; edited = false;
+    const perm = order(seed);
+    flowers.forEach(f => {
+      if (f.ci !== perm[f.idx]) { f.job++; f.q = null; f.hist = null; }
+      setConcept(f, perm[f.idx]);
     });
-    if (sel) syncPanel();
+    syncVariations();
     requestPaint();
     if ($("rollColor").checked) { Object.assign(color, randomColor(seedRng(seed, 9))); syncColor(); recolor(); }
     showSeed(); save();
-    rollMany(list, f => { const rng = seedRng(seed, f.idx); return () => randomParams(rng, f.concept); });
+    rollMany(flowers, f => { const rng = seedRng(seed, f.idx); return () => randomParams(rng, f.concept); });
   }
   function markEdited() {
     if (edited) return;
@@ -733,7 +719,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   }
 
   function save() {
-    store.set(SKEY, { cells: flowers.map(f => ({ ci: f.ci, q: f.q, locked: f.locked })), color, layout, sel: sel ? sel.idx : 4, seed, edited });
+    store.set(SKEY, { cells: flowers.map(f => ({ ci: f.ci, q: f.q })), color, layout, sel: sel ? sel.idx : 4, seed, edited });
   }
 
   // ==================================================================================
@@ -763,36 +749,20 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     layoutTimer = setTimeout(() => { flowers.forEach(f => f.q && render(f)); save(); }, 120);
   })();
 
-  const PARAMS = [
-    ["n", 3, 12, 1], ["lam", -3, 3, 0.001], ["alpha", -6, 6, 0.001],
-    ["beta", -2, 2, 0.001], ["gamma", -1.5, 1.5, 0.001], ["omega", -0.5, 0.5, 0.001],
-  ];
-  const SYM = { n: "n", lam: "λ", alpha: "α", beta: "β", gamma: "γ", omega: "ω" };
-  let sel = null, timer = null;
-  const paramShow = PARAMS.map(([k, lo, hi, st]) =>
-    slider($("sliders"), SYM[k], lo, hi, st, k === "n" ? 0 : 3, () => sel && sel.q ? sel.q[k] : 0, v => {
-      if (!sel || !sel.q) return;
-      sel.gen++; sel.busy.hidden = true;
-      sel.q = { ...sel.q, [k]: v };
-      markEdited();
-      clearTimeout(timer); const f = sel; timer = setTimeout(() => { render(f); save(); }, 40);
-    }));
-
-  function syncPanel() {
-    if (!sel) return;
-    $("selTitle").textContent = `選択中の花 #${sel.idx + 1} ${sel.concept.name}`;
-    $("lock").textContent = sel.locked ? "ロック解除" : "ロック";
-    paramShow.forEach(f => f());
+  let sel = null, flashTimer = null;
+  // 選んだ花の名前を変奏のボタンに出す
+  function syncVariations() {
+    $("variations").textContent = sel ? `選んだ花（${sel.concept.name}）の変奏で埋める` : "選んだ花の変奏で埋める";
   }
-  function select(f) {
-    if (sel) sel.mark.classList.remove("sel");
-    sel = f; sel.mark.classList.add("sel");
-    syncPanel(); save();
+  function select(f, flash = false) {
+    if (sel) sel.mark.classList.remove("flash");
+    sel = f; syncVariations(); save();
+    if (flash) { sel.mark.classList.add("flash"); clearTimeout(flashTimer); flashTimer = setTimeout(() => f.mark.classList.remove("flash"), 900); }
   }
   wrap.addEventListener("click", e => {
     const r = wrap.getBoundingClientRect();
     const i = clip(Math.floor((e.clientX - r.left) / r.width * 3), 0, 2), j = clip(Math.floor((e.clientY - r.top) / r.height * 3), 0, 2);
-    select(flowers[j * 3 + i]);
+    select(flowers[j * 3 + i], true);
   });
   wrap.addEventListener("keydown", e => {
     if (!sel) return;
@@ -800,12 +770,8 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     if (d === undefined) return;
     e.preventDefault();
     const i = sel.idx + d;
-    if (i >= 0 && i < 9 && !(Math.abs(d) === 1 && Math.floor(i / 3) !== Math.floor(sel.idx / 3))) select(flowers[i]);
+    if (i >= 0 && i < 9 && !(Math.abs(d) === 1 && Math.floor(i / 3) !== Math.floor(sel.idx / 3))) select(flowers[i], true);
   });
-  const showSel = () => wrap.classList.toggle("show-sel", $("showSel").checked);
-  $("showSel").addEventListener("change", showSel);
-  const showNames = () => wrap.classList.toggle("show-names", $("showNames").checked);
-  $("showNames").addEventListener("change", showNames);
 
   // 色彩 UI
   CONCEPTS.forEach((c, i) => {
@@ -826,19 +792,20 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   function syncColor() {
     for (const r of document.querySelectorAll("input[name=cmode]")) r.checked = r.value === color.mode;
     $("base").value = color.base; $("bg").value = color.bg;
+    $("bgClear").checked = color.transparent; $("bg").disabled = color.transparent;
     color.each.forEach((c, i) => { $(`each${i}`).value = c; });
     colorShow.forEach(f => f());
   }
   for (const r of document.querySelectorAll("input[name=cmode]"))
     r.addEventListener("change", () => { if (r.checked) { color.mode = r.value; recolor(); } });
   for (const k of ["base", "bg"]) $(k).addEventListener("input", e => { color[k] = e.target.value; recolor(); });
+  $("bgClear").addEventListener("change", e => { color.transparent = e.target.checked; $("bg").disabled = color.transparent; recolor(); });
   $("randColor").addEventListener("click", () => { Object.assign(color, randomColor(freshRng())); syncColor(); recolor(); });
   $("resetColor").addEventListener("click", () => {
     Object.assign(color, { ...COLOR_DEFAULT, mode: color.mode, each: [...SKY9] }); syncColor(); recolor();
   });
 
   // 操作
-  const unlocked = () => flowers.filter(f => !f.locked);
   $("rollAll").addEventListener("click", () => generate(newSeed()));
   const seedError = msg => { $("seedErr").textContent = msg || ""; $("seedErr").hidden = !msg; };
   const seedFromInput = () => {
@@ -863,28 +830,19 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   $("seedNow").addEventListener("click", () => { seedError(); generate(dateSeed(new Date())); });
   $("seedGo").addEventListener("click", seedFromInput);
   $("seedIn").addEventListener("keydown", e => { if (e.key === "Enter") seedFromInput(); });
-  // 変奏：選んだ花のパラメータを、ほかの花の種類（対称数・層）で描く
+  // 変奏：ほかの 8 つを、選んだ花と同じ種類にして、そのパラメータの近く（変化の大きさを花ごとに変える）で埋める。
+  // 姿の変化はパラメータから決まるので、近いパラメータでも花びらの輪郭や層の構成は少しずつ違う姿になる
   $("variations").addEventListener("click", () => {
     if (!sel || !sel.q) return;
-    const base = sel.q, list = unlocked().filter(f => f !== sel);
-    if (!list.length) return;
+    const base = sel.q, c = sel.concept, list = flowers.filter(f => f !== sel);
     const base0 = newSeed();
     markEdited();
+    list.forEach(f => { f.job++; f.hist = null; setConcept(f, sel.ci); });
+    requestPaint();
     rollMany(list, f => {
       const r = seedRng(base0, f.idx), sc = 0.5 + 1.5 * list.indexOf(f) / Math.max(1, list.length - 1);
-      const b = { ...base, n: f.concept.ns.includes(base.n) ? base.n : pick(r, f.concept.ns), omega: f.concept.omega0 ? 0 : base.omega };
-      return () => mutate(r, b, sc, f.concept);
+      return () => mutate(r, base, sc, c);
     });
-  });
-  $("rollOne").addEventListener("click", () => {
-    if (!sel) return;
-    const rng = freshRng(), f = sel;
-    markEdited(); roll(f, () => randomParams(rng, f.concept));
-  });
-  $("lock").addEventListener("click", () => {
-    if (!sel) return;
-    sel.locked = !sel.locked; sel.lk.hidden = !sel.locked;
-    syncPanel(); save();
   });
 
   // 保存：パソコンは Blob URL でダウンロード。タッチ端末はページ内に画像を出し、長押しか共有シートで保存する
@@ -946,16 +904,17 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("saver").hidden) closeSaver(); });
 
   // 起動：URL の ?seed= を最優先。次に保存済みの花、どちらもなければ新しいシードで生成
-  syncColor(); recolor(); showSel(); showNames();
+  syncColor(); recolor();
   let urlSeed = null;
   try { urlSeed = parseSeed(new URLSearchParams(location.search).get("seed")); } catch (e) { seedError(`URL の ${e.message}`); }
+  // 変奏のあとは同じ種類が並ぶので、種類の重複は許す
   const hasSaved = Array.isArray(saved.cells) && saved.cells.length === 9 &&
-    new Set(saved.cells.map(c => c && c.ci)).size === 9 && saved.cells.every(c => Number.isInteger(c.ci) && c.ci >= 0 && c.ci < 9);
+    saved.cells.every(c => c && Number.isInteger(c.ci) && c.ci >= 0 && c.ci < 9);
   flowers.forEach(f => setConcept(f, hasSaved ? saved.cells[f.idx].ci : f.idx));
   if (hasSaved) {
     saved.cells.forEach((s, i) => {
       const f = flowers[i];
-      f.q = s.q || null; f.locked = !!s.locked; f.lk.hidden = !f.locked;
+      f.q = s.q || null;
     });
   }
   select(flowers[hasSaved ? clip(saved.sel | 0, 0, 8) : 4]);
