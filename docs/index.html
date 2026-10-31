@@ -105,7 +105,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   <h1>Symbea Flower</h1>
   <p class="lead">対称カオス写像 z<sub>t+1</sub> = ( λ + α|z|² + β Re(z<sup>n</sup>) + iω ) z + γ z̄<sup>n−1</sup> が描く 9 種の花を、
   一枚のビジュアルの上に 3 × 3 で配置します。花ごとに対称数・探索条件・重ね方（層）を変え、それぞれの花らしさを写像の上に与えています。
-  花をクリックして選ぶと、ほかの 8 つをその花の変奏で埋められます。</p>
+  花をクリックして選ぶと、ほかの 8 つをそのデザインの変奏で再探索できます。</p>
 
   <div class="studio">
     <div class="canvas-wrap" id="wrap" tabindex="0" role="button" aria-label="花を選ぶ">
@@ -120,8 +120,8 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
         <button id="seedCopy">コピー</button>
       </div>
       <button id="rollAll" class="primary">9 つをランダム探索</button>
-      <button id="variations">選んだ花の変奏で埋める</button>
-      <p class="hint" style="margin:4px 0 0">花をクリックして選ぶと、ほかの 8 つをその花の変奏で埋められます。</p>
+      <button id="variations">選択したデザインで、再探索する</button>
+      <p class="hint" style="margin:4px 0 0">花をクリックして選ぶと、ほかの 8 つをそのデザインの変奏で再探索します。</p>
       <div class="seedrow">
         <input type="text" id="seedIn" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="12 桁のシード" aria-label="シード（12 桁）">
         <button id="seedGo">このシードで生成</button>
@@ -696,7 +696,6 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
       if (f.ci !== perm[f.idx]) { f.job++; f.q = null; f.hist = null; }
       setConcept(f, perm[f.idx]);
     });
-    syncVariations();
     requestPaint();
     if ($("rollColor").checked) { Object.assign(color, randomColor(seedRng(seed, 9))); syncColor(); recolor(); }
     showSeed(); save();
@@ -750,13 +749,9 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   })();
 
   let sel = null, flashTimer = null;
-  // 選んだ花の名前を変奏のボタンに出す
-  function syncVariations() {
-    $("variations").textContent = sel ? `選んだ花（${sel.concept.name}）の変奏で埋める` : "選んだ花の変奏で埋める";
-  }
   function select(f, flash = false) {
     if (sel) sel.mark.classList.remove("flash");
-    sel = f; syncVariations(); save();
+    sel = f; save();
     if (flash) { sel.mark.classList.add("flash"); clearTimeout(flashTimer); flashTimer = setTimeout(() => f.mark.classList.remove("flash"), 900); }
   }
   wrap.addEventListener("click", e => {
