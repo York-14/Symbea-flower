@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Symbea Flower — 9 つの花（3 × 3）</title>
-<meta name="description" content="対称カオス写像が描く 9 種の花（ポインセチア、マーガレット、ライラック、アネモネ、センニチコウ、ダリア、ニゲラ、モモ、マリーゴールド）を 3 × 3 に配置する。">
+<meta name="description" content="対称カオス写像が描く 9 種の花（ポインセチア、マーガレット、アマリリス、アネモネ、センニチコウ、ダリア、ニゲラ、モモ、マリーゴールド）を 3 × 3 に配置する。">
 <style>
 :root {
   --bg: #fbfbfa; --surface: #ffffff; --text: #1c2230; --muted: #5a6475;
@@ -169,7 +169,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   <p class="hint">写像・ランダム探索・シードの仕組みは
   <a href="https://york-14.github.io/Generative-flower-Order-Chaos/2d-v2.html">Generative Flower 2D ver.2</a> と同じです。
   候補は発散せず、ボックス次元・余白が中庸で、最大 Lyapunov 指数が正（カオス）のものだけを採用し、さらに花ごとの条件（対称数・余白の範囲）を満たすものを優先します。
-  9 つの花の形は、同じ軌道を縮小・回転・極座標の変形をかけて何層か重ねることで作っています（ダリアは 6 層、ライラックは小花の房、モモは雄しべの輪など）。どの花がどのマスに入るかもシードで決まります。</p>
+  9 つの花の形は、同じ軌道を縮小・回転・極座標の変形をかけて何層か重ねることで作っています（ダリアは 6 層、アマリリスは 6 弁の星と雄しべ、モモは雄しべの輪など）。どの花がどのマスに入るかもシードで決まります。</p>
   <p class="hint">シードは 12 桁の数（000000000000〜999999999999）で、日付 YYYYMMDDHHmm もそのまま使えます。
   左下のシードを入力欄に入れるか、URL に <code>?seed=12桁の数</code> を付けると、同じ 9 つの花を再現できます。数字以外の文字列はハッシュして 12 桁に収めます。
   マス i の花は乱数系列 i、色は系列 9、並び順は系列 10 です。ロックした花は種類ごとその場に残ります。再抽選・変奏・パラメータの編集・ロックした花の保持でシードの結果から変わったときは、シードの後ろに <code>*</code> が付きます。</p>
@@ -323,7 +323,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
   // ==================================================================================
   const TAU = Math.PI * 2;
   const BALL = 0.55;                          // r → r^0.55：内側を押し広げて、球・円盤のように詰まった形にする
-  // パラメータから決まる乱数（ライラックの房の配置など）。パラメータが同じなら同じ形になる。salt で系列を分ける
+  // パラメータから決まる乱数（雄しべの配置など）。パラメータが同じなら同じ形になる。salt で系列を分ける
   function hashRng(q, salt = 0) {
     let h = 0x811C9DC5 ^ Math.imul(salt, 0x9E3779B9);
     for (const ch of [q.n, q.lam, q.alpha, q.beta, q.gamma, q.omega].map(v => (+v).toFixed(6)).join(","))
@@ -344,16 +344,21 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
       flag: (def, prob) => { const u = lr(); return vary > 0 ? u < prob : def; },
     };
   }
-  // ライラック：4 弁の小花を、下がふくらみ上が尖った卵形の房（円錐花序）に、互いに一定の距離を空けて詰める。
-  // 房の幅・尖り方・小花の大きさが花ごとに変わる
-  function panicle(q, V) {
-    const r = hashRng(q), out = [], W = V.v(0.46, 0.3, 0.6), pt = V.v(0.7, 0.35, 1.4), fs = V.v(1, 0.75, 1.35);
-    const width = h => W * Math.pow(Math.sin(Math.PI * (0.1 + 0.9 * h)), pt) * (1 - 0.3 * h);
-    for (let t = 0; t < 1500 && out.length < 90; t++) {
-      const h = r(), x = (r() * 2 - 1) * width(h), y = -0.84 + 1.72 * h;
-      const s = (0.065 + 0.05 * (1 - h) + r() * 0.02) * fs;
-      if (out.every(o => Math.hypot(o.dx - x, o.dy - y) > (o.s + s) * 0.62)) out.push({ s, rot: r() * TAU, dx: x, dy: y });
-    }
+  // アマリリス：花の中心から伸びる 6 本の雄しべと 1 本の雌しべ。花糸はごく小さな軌道を点線のように並べ、先に葯（柱頭は 3 裂）を付ける
+  function pistils(q, V) {
+    const r = hashRng(q), out = [], L0 = V.v(0.55, 0.42, 0.7), bend = V.v(0, -0.12, 0.12);
+    const line = (ang, len, tip) => {
+      const D = 14;
+      for (let j = 1; j <= D; j++) {
+        const t = j / D, d = 0.1 + (len - 0.1) * t, a = ang + bend * t * t;
+        out.push({ s: 0.012, rot: r() * TAU, dx: d * Math.cos(a), dy: d * Math.sin(a), dens: 8 });
+      }
+      const a = ang + bend;
+      tip.forEach(([da, s]) => out.push({ s, rot: r() * TAU, dx: len * Math.cos(a + da), dy: len * Math.sin(a + da), dens: 12 }));
+    };
+    const base = r() * TAU;
+    for (let i = 0; i < 6; i++) line(base + i * TAU / 6 + (r() - 0.5) * 0.25, L0 * (0.85 + r() * 0.2), [[0, 0.03 + r() * 0.01]]);
+    line(base + TAU / 12, L0 * 1.12, [[-0.06, 0.022], [0, 0.022], [0.06, 0.022]]);     // 雌しべ（柱頭は 3 裂）
     return out;
   }
   // モモ：中心から長く伸びる雄しべの先の葯（やく）。同じ軌道をごく小さくして、半径をばらつかせた輪に並べる
@@ -375,7 +380,12 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
       form: { size: [0.78, 1], m: [2], a: [0.05, 0.4], p: [0.8, 2.5], tw: 0.15 },
       layers: (q, V) => [{ s: 1, mod: true }, ...(V.flag(true, 0.65) ? [{ s: V.v(0.96, 0.8, 1), rot: Math.PI / q.n, mod: true }] : []),
                          disc(V.v(0.22, 0.14, 0.32))] },
-    { name: "ライラック", ns: [4], fill: [0.35, 0.7], form: { size: [0.82, 1] }, layers: panicle },
+    // アマリリス：3 回対称の軌道で尖った花びら 3 枚の層を 2 つ、π/3 ずらして重ね、外花被 3 枚・内花被 3 枚の 6 弁の星形にする。
+    // 中心は濃い喉、そこから雄しべ 6 本と雌しべ 1 本が伸びる
+    { name: "アマリリス", ns: [3], omega0: true, fill: [0.25, 0.65], align: true,
+      form: { size: [0.85, 1], m: [1], a: [0.35, 0.65], p: [1.5, 4], tw: 0.08 },
+      layers: (q, V) => [{ s: 1, mod: true }, { s: V.v(0.88, 0.75, 0.95), rot: Math.PI / 3, mod: true },
+                         disc(V.v(0.2, 0.14, 0.28), 3), ...pistils(q, V)] },
     { name: "アネモネ", ns: [5, 6, 7, 8], fill: [0.35, 0.7],
       form: { size: [0.75, 1], m: [1], a: [0.1, 0.45], p: [0.5, 1.6], tw: 0.25 },
       layers: (q, V) => [{ s: 1, mod: true }, ...(V.flag(false, 0.45) ? [{ s: V.v(0.65, 0.5, 0.78), rot: Math.PI / q.n, mod: true, dens: 0.8 }] : []),
@@ -586,17 +596,22 @@ footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
     if (!pr) { f.hist = null; requestPaint(); return; }
     const C = f.C, half = C / 2 - C / 90, inv = 1 / (pr.R * 1.02), h = f.hist;
     // 中心の穴の半径（内径）と、半径の累積分布（eq の層で使う）を短い軌道で測る
-    let x = pr.x, y = pr.y, rmin = Infinity;
+    // align の花は、花びらの輪郭をアトラクタの張り出す向きに合わせるため、Σ r²·e^{inθ} の偏角も測る
+    let x = pr.x, y = pr.y, rmin = Infinity, ex = 0, ey = 0;
     const NB = 512, cdf = new Float32Array(NB + 1);
     for (let i = 0; i < 30000; i++) {
       step(q, x, y); x = NX; y = NY; const r = x * x + y * y; if (r < rmin) rmin = r;
       cdf[Math.min(NB - 1, Math.sqrt(r) * inv * NB | 0) + 1]++;
+      if (f.concept.align && r > 0) {
+        const th = Math.atan2(y, x) * q.n; ex += r * Math.cos(th); ey += r * Math.sin(th);
+      }
     }
     for (let i = 1; i <= NB; i++) cdf[i] += cdf[i - 1];
     for (let i = 0; i <= NB; i++) cdf[i] = Math.sqrt(cdf[i] / cdf[NB]);
     const r0 = Math.min(0.9, Math.sqrt(rmin) * inv * 0.94), k0 = 1 / (1 - r0);
     x = pr.x; y = pr.y;
     const V = form(q, f.concept, layout.vary), sz = V.size * half;
+    if (f.concept.align) V.phase = Math.atan2(ey, ex) / q.n;
     const L = f.concept.layers(q, V).map(l => {
       l = { s: 1, rot: 0, dx: 0, dy: 0, warp: 1, dens: 1, sy: 1, upper: false, eq: false, mod: false, ...l };
       return { ...l, cs: Math.cos(l.rot) * l.s * sz, sn: Math.sin(l.rot) * l.s * sz, mod: l.mod && (V.a > 0 || V.tw !== 0),
