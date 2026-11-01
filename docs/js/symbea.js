@@ -748,6 +748,42 @@
     parts.push(src.subarray(33));
     return new Blob(parts, { type: "image/png" });
   }
+  // 段階的に半分ずつ縮小してから目的の大きさにする（一度に大きく縮めると細い線がつぶれて粗くなるため）
+  function downscale(src, w) {
+    let cur = src;
+    while (cur.width / 2 >= w) {
+      const half = Object.assign(document.createElement("canvas"), { width: cur.width / 2 | 0, height: cur.height / 2 | 0 });
+      const c = half.getContext("2d"); c.imageSmoothingQuality = "high"; c.drawImage(cur, 0, 0, half.width, half.height);
+      cur = half;
+    }
+    const out = Object.assign(document.createElement("canvas"), { width: w, height: w }), c = out.getContext("2d");
+    c.imageSmoothingQuality = "high"; c.drawImage(cur, 0, 0, w, w);
+    return out;
+  }
+  // パターン壁紙 1320 × 2868 px：今の 3 × 3 の 9 つの花を写して、横 5 ブロック（花 15 個）で敷き詰める。
+  // ブロックごとに、9 つの並び順・花ごとの回転（90° 単位）・左右反転をシードの系列 11 で決める（同じシードなら同じ柄）。
+  // 縦は欠けない段数（10 段）を上下中央に置く。シードはパターンの左下、下の余白に 1 つだけ入れる
+  const PT_COLS = 5;
+  function pattern() {
+    const B = WP_W / PT_COLS, cell = B / 3, rows = Math.floor(WP_H / B), y0 = Math.round((WP_H - rows * B) / 2);
+    const sheet = downscale(canvas, Math.round(cell * 3)), sc = sheet.width / 3;
+    const out = Object.assign(document.createElement("canvas"), { width: WP_W, height: WP_H }), c = out.getContext("2d");
+    if (!color.transparent) { c.fillStyle = color.bg; c.fillRect(0, 0, WP_W, WP_H); }
+    const r = seedRng(seed ?? 0, 11);
+    for (let by = 0; by < rows; by++) for (let bx = 0; bx < PT_COLS; bx++) {
+      const perm = [...Array(9).keys()];
+      for (let i = 8; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+      perm.forEach((src, k) => {
+        const rot = Math.floor(r() * 4), flip = r() < 0.5;
+        const cx = bx * B + (k % 3 + 0.5) * cell, cy = y0 + by * B + (Math.floor(k / 3) + 0.5) * cell;
+        c.save(); c.translate(cx, cy); c.rotate(rot * Math.PI / 2); if (flip) c.scale(-1, 1);
+        c.drawImage(sheet, (src % 3) * sc, Math.floor(src / 3) * sc, sc, sc, -cell / 2, -cell / 2, cell, cell);
+        c.restore();
+      });
+    }
+    drawSeedLabel(c, WP_W, WP_W, 0.013, WP_W * 0.012, y0 + rows * B + WP_W * 0.03);
+    return out;
+  }
   // ファイル名はシード（1 輪は _1x1、縦長は _1320x2868、編集済みは _edited を付ける）
   function fileName(suffix) {
     const base = seed !== null ? pad12(seed) : "symbea_flower";
@@ -776,6 +812,7 @@
   }
   $("saveAll").addEventListener("click", () => savePNG(withSeedLabel(), fileName("")));
   $("saveTall").addEventListener("click", () => savePNG(wallpaper(), fileName(`_${WP_W}x${WP_H}`)));
+  if ($("savePattern")) $("savePattern").addEventListener("click", () => savePNG(pattern(), fileName(`_pattern_${WP_W}x${WP_H}`)));
   $("saverShare").addEventListener("click", () => { if (saveFile) navigator.share({ files: [saveFile] }).catch(() => {}); });
   const closeSaver = () => { $("saver").hidden = true; };
   $("saverClose").addEventListener("click", closeSaver);
