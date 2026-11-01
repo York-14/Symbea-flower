@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Symbea Flower — 1 輪</title>
+<meta name="description" content="対称カオス写像が描く花を 1 輪だけ探索する。花の種類（ポインセチア、マーガレット、アマリリス、アネモネ、センニチコウ、ダリア、ニゲラ、モモ、マリーゴールド）もシードからランダムに決まる。">
+<link rel="stylesheet" href="css/symbea.css">
+</head>
+<body data-grid="1">
+<main>
+  <h1>Symbea Flower — 1 輪</h1>
+  <p class="lead">対称カオス写像 z<sub>t+1</sub> = ( λ + α|z|² + β Re(z<sup>n</sup>) + iω ) z + γ z̄<sup>n−1</sup> が描く花を、1 輪だけ大きく描きます。
+  花の種類（9 種）もシードからランダムに決まります。同じシードの 3 × 3 版の左上と同じ花です。
+  <a href="./">3 × 3 版へ →</a></p>
+
+  <div class="studio">
+    <div class="canvas-wrap" id="wrap">
+      <canvas id="cv" width="1440" height="1440"></canvas>
+      <div id="marks"></div>
+      <div id="seed"></div>
+    </div>
+    <div class="panel">
+      <h4>全体</h4>
+      <div class="seedcur">
+        <code id="seedCur" title="クリックで全選択">—</code>
+        <button id="seedCopy">コピー</button>
+      </div>
+      <button id="rollAll" class="primary">ランダム探索</button>
+      <button id="variations">選択したデザインで、再探索する</button>
+      <p class="hint" style="margin:4px 0 0">今の花と同じ種類で、近いデザインをもう一度探索します。</p>
+      <div class="seedrow">
+        <input type="text" id="seedIn" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="12 桁のシード" aria-label="シード（12 桁）">
+        <button id="seedGo">このシードで生成</button>
+      </div>
+      <p class="hint" id="seedErr" role="alert" style="margin:4px 0 0;color:#c0392b" hidden></p>
+      <button id="seedNow">今の日時で生成</button>
+      <label class="check"><input type="checkbox" id="rollColor"> 探索のたびに色も変える</label>
+      <div id="layoutSliders"></div>
+      <div class="row">
+        <button id="saveAll">PNG で保存</button>
+        <button id="saveTall">1320 × 2868 で保存</button>
+      </div>
+
+      <h4>色彩</h4>
+      <div class="seg" role="radiogroup" aria-label="色の割り当て" hidden>
+        <label><input type="radio" name="cmode" value="same"> 9 つ同色</label>
+        <label><input type="radio" name="cmode" value="each"> 9 つ別色</label>
+      </div>
+      <div class="colors" id="sameColors"><label>花の色<input type="color" id="base"></label></div>
+      <div class="grid9" id="eachColors"></div>
+      <div class="colors"><label>背景<input type="color" id="bg"></label></div>
+      <label class="check"><input type="checkbox" id="bgClear"> 背景を透明にする（PNG も透明で保存）</label>
+      <div id="colorSliders"></div>
+      <div id="swatch"></div>
+      <div class="row">
+        <button id="randColor">色を抽選</button>
+        <button id="resetColor">色をリセット</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">写像・ランダム探索・シードの仕組みは 3 × 3 版と同じです。シードは 12 桁の数（000000000000〜999999999999）で、日付 YYYYMMDDHHmm もそのまま使えます。
+  左下のシードを入力欄に入れるか、URL に <code>?seed=12桁の数</code> を付けると、同じ花を再現できます。
+  「1320 × 2868 で保存」は、花を縦長の画像の上下中央に置き、ビジュアルの左下にシードを入れて保存します。ファイル名はシードです。</p>
+
+  <footer>Base: <a href="https://github.com/York-14/Generative-flower-Order-Chaos">github.com/York-14/Generative-flower-Order-Chaos</a></footer>
+</main>
+
+<div class="saver" id="saver" role="dialog" aria-modal="true" aria-label="画像を保存" hidden>
+  <div class="saver-box">
+    <img id="saverImg" alt="保存する画像">
+    <p>画像を長押しして「"写真"に保存」を選ぶと、写真に保存できます。</p>
+    <div class="saver-btns">
+      <button id="saverShare" class="primary" hidden>共有・保存</button>
+      <button id="saverClose">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/symbea.js"></script>
+</body>
+</html>
