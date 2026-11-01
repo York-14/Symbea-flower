@@ -690,14 +690,16 @@
     drawSeedLabel(c, S, S, 0.013, S * 0.012, S * 0.99);
     return out;
   }
-  // 縦長 1320 × 2868 px：背景で塗りつぶし、ビジュアル（正方形）を幅いっぱいに上下中央へ置く。シードは画像の左下
+  // 縦長 1320 × 2868 px：背景で塗りつぶし、ビジュアル（正方形）を幅いっぱいに上下中央へ置く。
+  // シードは画像の左下ではなく、ビジュアルの左下（正方形の PNG と同じ位置・同じ比率の大きさ）に入れる
   const WP_W = 1320, WP_H = 2868;
   function wallpaper() {
     const out = Object.assign(document.createElement("canvas"), { width: WP_W, height: WP_H }), c = out.getContext("2d");
+    const top = Math.round((WP_H - WP_W) / 2);
     if (!color.transparent) { c.fillStyle = color.bg; c.fillRect(0, 0, WP_W, WP_H); }
     c.imageSmoothingQuality = "high";
-    c.drawImage(canvas, 0, Math.round((WP_H - WP_W) / 2), WP_W, WP_W);
-    drawSeedLabel(c, WP_W, WP_H, 0.016, WP_W * 0.04, WP_H - WP_W * 0.08);
+    c.drawImage(canvas, 0, top, WP_W, WP_W);
+    drawSeedLabel(c, WP_W, WP_W, 0.013, WP_W * 0.012, top + WP_W * 0.99);
     return out;
   }
   // PNG の tEXt チャンク（Latin-1 のみ）にシードを書き込む（IHDR の直後に挿入）
