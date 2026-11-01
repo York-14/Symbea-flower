@@ -5,7 +5,25 @@
 
 **🌐 https://york-14.github.io/Symbea-flower/** （`?seed=12桁` で再現）
 
-- ページ：`docs/index.html`（GitHub Pages：main ブランチの `/docs` を公開）
+| ページ | URL | 内容 |
+|---|---|---|
+| 3 × 3 | https://york-14.github.io/Symbea-flower/ | 9 種の花を 3 × 3 に配置（`docs/index.html`） |
+| 1 輪 | https://york-14.github.io/Symbea-flower/single.html | 花を 1 輪だけ探索。花の種類もシードでランダム（`docs/single.html`） |
+
+- 2 つのページは同じ `docs/js/symbea.js` と `docs/css/symbea.css` を使い、`<body data-grid="3|1">` で切り替える
+- 1 輪の花は、同じシードの 3 × 3 の左上と同じ花（種類・パラメータ）。保存状態（localStorage）はページごとに別
+- GitHub Pages：main ブランチの `/docs` を公開
+
+## 画像の保存
+
+| ボタン | サイズ | ファイル名（3 × 3） | ファイル名（1 輪） |
+|---|---|---|---|
+| PNG で保存 | 1440 × 1440 | `342717359454.png` | `342717359454_1x1.png` |
+| 1320 × 2868 で保存 | 1320 × 2868 | `342717359454_1320x2868.png` | `342717359454_1x1_1320x2868.png` |
+
+- ファイル名はシード。変奏でシードの結果から変わったときは `_edited` が付く
+- 1320 × 2868 は、背景で塗りつぶした縦長の画像の上下中央に、ビジュアル（正方形）を幅いっぱいに置き、画像の左下にシードを入れる
+- 背景を透明にしているときは、どちらも透明な PNG になる。PNG の tEXt にシードと再現用の URL を書き込む
 
 ## ベースから引き継いだもの（変更なし）
 
