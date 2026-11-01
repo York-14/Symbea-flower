@@ -313,7 +313,7 @@
   const lumOf = c => (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255;
   const SKY = "#4fb0e3";
   const SKY9 = ["#4fb0e3", "#6cc4ec", "#3d97d6", "#58bcd9", "#7fb6ee", "#3a86c8", "#63c7e3", "#4b9fe6", "#8ccbef"];
-  const COLOR_DEFAULT = { mode: "same", base: SKY, each: SKY9, bg: "#ffffff", transparent: false, depth: 0.55, gamma: 0.8, exposure: 1.1 };
+  const COLOR_DEFAULT = { mode: "same", base: SKY, each: SKY9, bg: "#ffffff", transparent: false, depth: 0.55, gamma: 1.19, exposure: 1.5 };
   const COLOR_SLIDERS = [["depth", "芯の濃さ", 0, 0.9, 0.01, 2], ["gamma", "ガンマ", 0.3, 2, 0.01, 2],
                          ["exposure", "露出", 0.4, 3, 0.01, 2]];
 
