@@ -760,10 +760,10 @@
     c.imageSmoothingQuality = "high"; c.drawImage(cur, 0, 0, w, w);
     return out;
   }
-  // パターン壁紙 1320 × 2868 px：今の 3 × 3 の 9 つの花を写して、横 5 ブロック（花 15 個）で敷き詰める。
+  // パターン壁紙 1320 × 2868 px：今の 3 × 3 の 9 つの花を写して、横 3 ブロック（花 9 個）で敷き詰める。
   // ブロックごとに、9 つの並び順・花ごとの回転（90° 単位）・左右反転をシードの系列 11 で決める（同じシードなら同じ柄）。
-  // 縦は欠けない段数（10 段）を上下中央に置く。シードはパターンの左下、下の余白に 1 つだけ入れる
-  const PT_COLS = 5;
+  // 縦は欠けない段数（6 段）を上下中央に置く。シードはパターンの左下、下の余白に 1 つだけ入れる
+  const PT_COLS = 3;
   function pattern() {
     const B = WP_W / PT_COLS, cell = B / 3, rows = Math.floor(WP_H / B), y0 = Math.round((WP_H - rows * B) / 2);
     const sheet = downscale(canvas, Math.round(cell * 3)), sc = sheet.width / 3;
