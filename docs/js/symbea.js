@@ -425,10 +425,38 @@
     ctx.putImageData(img, 0, 0);
   }
 
+  // 描き終えた花の外形（左端と下端、キャンバスの px）。点のごく一部（0.1%）のはみ出しは無視する
+  function flowerBox(f) {
+    const C = f.C, h = f.hist, col = new Uint32Array(C), row = new Uint32Array(C);
+    let tot = 0;
+    for (let j = 0; j < C; j++) for (let i = 0; i < C; i++) if (h[j * C + i]) { col[i]++; row[j]++; tot++; }
+    if (!tot) return null;
+    const cut = tot * 0.001;
+    let a = 0, left = 0, bottom = C - 1;
+    for (; left < C - 1; left++) { a += col[left]; if (a > cut) break; }
+    a = 0;
+    for (; bottom > 0; bottom--) { a += row[bottom]; if (a > cut) break; }
+    return { left: (f.idx % G + 0.5) * CELL - C / 2 + left, bottom: (Math.floor(f.idx / G) + 0.5) * CELL - C / 2 + bottom };
+  }
+  // シードの位置（キャンバスの px、x は左端、y はベースライン）。
+  // 3 × 3 はビジュアルの左下。1 輪は花が小さく真ん中にあるので、花の左下（左へ 0.035S、下へ 0.035S）に寄せる
+  function seedPos() {
+    const f = flowers[0], dflt = { x: S * 0.012, y: S * 0.99 };
+    if (G !== 1 || !f.box) return dflt;
+    return { x: clip(f.box.left - S * 0.035, dflt.x, S * 0.5), y: clip(f.box.bottom + S * 0.035, S * 0.5, dflt.y) };
+  }
+  // 画面のシード表示も同じ位置に置く（画像と同じ見え方にする）
+  function placeSeed() {
+    const el = $("seed"), p = seedPos();
+    if (G !== 1) return;
+    el.style.left = `${p.x / S * 100}%`; el.style.top = `${p.y / S * 100}%`; el.style.bottom = "auto";
+    el.style.transform = "translateY(-80%)"; el.style.fontSize = `${S * 0.013 / S * 100}cqw`;
+  }
+
   function render(f) {
     const id = ++f.job, q = f.q;
     f.C = Math.round(CELL * layout.size);
-    f.hist = new Float32Array(f.C * f.C); f.max = 1; f.pts = 0;
+    f.hist = new Float32Array(f.C * f.C); f.max = 1; f.pts = 0; f.box = null;
     const pr = q && probe(q);
     if (!pr) { f.hist = null; requestPaint(); return; }
     const C = f.C, half = C / 2 - C / 90, inv = 1 / (pr.R * 1.02), h = f.hist;
@@ -489,6 +517,7 @@
       f.pts += CHUNK;
       requestPaint();
       if (f.pts < TOTAL) requestAnimationFrame(chunk);
+      else if (G === 1) { f.box = flowerBox(f); placeSeed(); }
     })();
   }
 
@@ -687,7 +716,8 @@
   function withSeedLabel() {
     const out = Object.assign(document.createElement("canvas"), { width: S, height: S }), c = out.getContext("2d");
     c.drawImage(canvas, 0, 0);
-    drawSeedLabel(c, S, S, 0.013, S * 0.012, S * 0.99);
+    const p = seedPos();
+    drawSeedLabel(c, S, S, 0.013, p.x, p.y);
     return out;
   }
   // 縦長 1320 × 2868 px：背景で塗りつぶし、ビジュアル（正方形）を幅いっぱいに上下中央へ置く。
@@ -699,7 +729,8 @@
     if (!color.transparent) { c.fillStyle = color.bg; c.fillRect(0, 0, WP_W, WP_H); }
     c.imageSmoothingQuality = "high";
     c.drawImage(canvas, 0, top, WP_W, WP_W);
-    drawSeedLabel(c, WP_W, WP_W, 0.013, WP_W * 0.012, top + WP_W * 0.99);
+    const p = seedPos(), k = WP_W / S;
+    drawSeedLabel(c, WP_W, WP_W, 0.013, p.x * k, top + p.y * k);
     return out;
   }
   // PNG の tEXt チャンク（Latin-1 のみ）にシードを書き込む（IHDR の直後に挿入）
